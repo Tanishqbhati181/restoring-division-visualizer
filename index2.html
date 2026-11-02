@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Restoring Division, live circuit</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b14;--panel:#0e1526;--ink:#e8eefc;--mute:#a9b8da;--line:#1f2b45;--a:#3d7bff;--q:#ffb020;--m:#a05bff;--neg:#ff3b5c;--pos:#22e6a0}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);font:16px/1.5 'Bricolage Grotesque',system-ui,sans-serif;background-color:#070b14;background-image:linear-gradient(rgba(61,123,255,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(61,123,255,.09) 1px,transparent 1px);background-size:40px 40px;min-height:100vh}
+header{padding:30px 24px 8px;max-width:1180px;margin:auto}
+h1{font-size:clamp(38px,7vw,76px);line-height:1.02;margin:0 0 14px;font-weight:800;letter-spacing:-.03em;background:linear-gradient(90deg,#00e5ff 0%,#5b8cff 30%,#ff4fd8 65%,#ffd23f 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+header p{margin:0;max-width:62ch;color:#ffffff;font-size:18px;font-weight:500;padding:6px 0 6px 16px;border-left:5px solid #ff4fd8;text-shadow:0 0 14px rgba(91,140,255,.7)}
+main{max-width:1180px;margin:auto;padding:16px 24px 48px;display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:20px}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:linear-gradient(160deg,#131e3a,#0b1224);border:1px solid #2f4280;border-radius:14px;padding:18px;box-shadow:0 0 26px rgba(61,123,255,.14)}
+.wide{grid-column:1/-1}
+.setup{display:flex;flex-wrap:wrap;gap:14px;align-items:end}
+label{display:flex;flex-direction:column;font-size:13px;color:var(--mute);gap:4px}
+input{font:600 20px 'IBM Plex Mono',monospace;width:120px;padding:8px 10px;border:2px solid var(--line);border-radius:8px;background:#060a14;color:var(--ink)}
+input:focus{outline:none;border-color:var(--a)}
+button{font:600 15px 'Bricolage Grotesque',sans-serif;cursor:pointer;border:2px solid var(--line);background:#141e36;color:var(--ink);padding:9px 16px;border-radius:9px;transition:transform .08s,background .15s}
+button:hover{background:#1b2848}button:active{transform:translateY(2px)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--a);outline-offset:2px}
+button.go{background:var(--a);border-color:var(--a);color:#fff;box-shadow:0 0 18px rgba(61,123,255,.5)}
+button:disabled{opacity:.35;cursor:not-allowed}
+.presets{display:flex;gap:8px;flex-wrap:wrap}.presets button{padding:6px 11px;font-size:13px}
+#err{color:var(--neg);font-size:14px;width:100%;min-height:1px}
+/* live equation */
+.eqbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font:600 clamp(24px,4vw,40px) 'IBM Plex Mono',monospace}
+.qs{display:flex;gap:6px}
+.qb{width:42px;height:54px;display:grid;place-items:center;border:2px dashed var(--line);border-radius:9px;color:var(--mute)}
+.qb.on{border:2px solid var(--q);color:var(--q);box-shadow:0 0 16px rgba(255,176,32,.55)}
+.qb.new{animation:drop .5s}
+@keyframes drop{from{transform:translateY(-34px);opacity:0}to{transform:none;opacity:1}}
+.e2.pop{color:var(--pos);text-shadow:0 0 18px var(--pos);animation:pop .6s}
+/* registers */
+.stage{min-height:200px;position:relative}
+.reg{display:flex;align-items:center;gap:14px;margin:10px 0;flex-wrap:wrap}
+.reg .name{width:92px;font-weight:800;font-size:15px}
+.reg .name small{display:block;font-weight:500;color:var(--mute);font-size:12px}
+.bits{display:flex;gap:5px}
+.bit{width:40px;height:48px;border-radius:8px;display:grid;place-items:center;font:600 20px 'IBM Plex Mono',monospace;color:#fff;transition:background .3s}
+#A .bit{background:var(--a);box-shadow:0 0 16px rgba(61,123,255,.6)}
+#Q .bit{background:var(--q);color:#2b1d00;box-shadow:0 0 16px rgba(255,176,32,.55)}
+#M .bit{background:var(--m);box-shadow:0 0 16px rgba(160,91,255,.55)}
+.bit.z{opacity:.3;box-shadow:none!important}
+.bit.sign{outline:2px solid #ffffff99;outline-offset:3px}
+.bit.flip{animation:pop .5s}
+.bit.slide{animation:slideL .45s}
+@keyframes slideL{from{transform:translateX(45px)}to{transform:none}}
+@keyframes pop{0%{transform:translateY(-14px) scale(1.15)}100%{transform:none}}
+.val{font-size:14px;color:var(--mute);min-width:150px}.val b{color:var(--ink)}
+#A.neg .bit{background:var(--neg);box-shadow:0 0 20px var(--neg);animation:shake .45s}
+#A.back .bit{background:var(--pos);box-shadow:0 0 20px var(--pos);animation:rew .6s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@keyframes rew{0%{transform:rotateX(180deg)}100%{transform:none}}
+#stamp{display:none;position:absolute;right:6px;top:36px;pointer-events:none;font:800 34px 'Bricolage Grotesque';letter-spacing:.04em;padding:4px 16px;border:4px solid;border-radius:10px;transform:rotate(-8deg);background:rgba(7,11,20,.85)}
+#stamp.show{display:block;animation:stamp .55s}
+#stamp.n{color:var(--neg);border-color:var(--neg);text-shadow:0 0 14px var(--neg)}
+#stamp.p{color:var(--pos);border-color:var(--pos);text-shadow:0 0 14px var(--pos)}
+@keyframes stamp{0%{transform:scale(3) rotate(-14deg);opacity:0}60%{transform:scale(.92) rotate(-8deg);opacity:1}100%{transform:scale(1) rotate(-8deg)}}
+.explain{margin-top:12px;padding:14px 16px;border-radius:10px;background:rgba(61,123,255,.12);border-left:6px solid var(--a)}
+.explain.neg{background:rgba(255,59,92,.12);border-color:var(--neg)}.explain.pos{background:rgba(34,230,160,.1);border-color:var(--pos)}
+.explain h3{margin:0 0 4px;font-size:18px}.explain p{margin:0}
+.eq{font:600 17px 'IBM Plex Mono',monospace;margin-top:6px}
+.ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.led{display:inline-flex;gap:8px;align-items:center;margin-left:auto;font-size:14px;color:var(--mute)}
+.led i{width:14px;height:14px;border-radius:50%;background:var(--line);display:inline-block}
+.led i.on-neg{background:var(--neg);box-shadow:0 0 10px var(--neg)}.led i.on-pos{background:var(--pos);box-shadow:0 0 10px var(--pos)}
+.prog{height:8px;background:var(--line);border-radius:8px;overflow:hidden;margin-top:14px}
+.prog div{height:100%;background:var(--a);width:0;transition:width .3s}
+h2{font-size:18px;margin:0 0 10px;color:#8ec5ff}
+#tl{max-height:560px;overflow:auto;padding-right:4px}
+.it{margin-bottom:10px}.it>span{font-size:13px;font-weight:800;color:var(--mute)}
+.st{display:flex;width:100%;text-align:left;gap:8px;align-items:center;margin-top:4px;padding:7px 10px;font-size:14px;border:1.5px solid var(--line);border-radius:8px;font-weight:500;background:transparent}
+.st .t{flex:1}.st .r{font:600 12px 'IBM Plex Mono',monospace;color:var(--mute)}
+.st.done{background:rgba(34,230,160,.07)}.st.done .t::before{content:"✓ ";color:var(--pos)}
+.st.act{border-color:var(--a);background:#16213d;box-shadow:0 0 14px rgba(61,123,255,.5)}
+.st.rs{border-color:#6b2434}.st.rs.act{border-color:var(--neg);box-shadow:0 0 14px rgba(255,59,92,.5)}
+table{width:100%;border-collapse:collapse;font:14px 'IBM Plex Mono',monospace}
+th,td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--line)}th{font:700 13px 'Bricolage Grotesque',sans-serif;color:var(--mute)}
+.tag{padding:2px 8px;border-radius:99px;font-size:12px;color:#fff;font-family:'Bricolage Grotesque'}
+.tag.r{background:var(--neg)}.tag.k{background:var(--pos);color:#04271a}
+#result{display:none;background:linear-gradient(135deg,#102a4d,#2a1257);border:1px solid var(--a);border-radius:14px;padding:24px}
+#result.show{display:block;animation:pop .6s}
+#result h2{font-size:26px;margin-bottom:12px}
+.big{display:flex;gap:28px;flex-wrap:wrap}
+.big div{font-size:14px;color:#a9bccd}.big b{display:block;font:700 44px 'IBM Plex Mono',monospace;color:#fff;line-height:1.1}
+.big small{font:14px 'IBM Plex Mono',monospace;color:#8fe3bd}
+#result p{color:#cfdbe6;max-width:75ch}
+.fly{position:fixed;z-index:50;width:40px;height:48px;border-radius:8px;display:grid;place-items:center;font:600 20px 'IBM Plex Mono',monospace;background:var(--q);color:#2b1d00;box-shadow:0 0 26px var(--q);pointer-events:none}
+.cf{position:fixed;z-index:60;width:9px;height:14px;pointer-events:none}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Restoring division, live circuit</h1>
+  <p>Shift, subtract, check the sign. If A goes negative, the divisor is added straight back, so a negative remainder never reaches the next step.</p>
+</header>
+<main>
+  <section class="card setup wide">
+    <label>Dividend<input id="dv" type="number" min="0" max="255" value="11"></label>
+    <label>Divisor<input id="ds" type="number" min="1" max="255" value="3"></label>
+    <button class="go" id="start">Start</button>
+    <div class="presets"><span style="align-self:center;font-size:13px;color:var(--mute)">Try:</span>
+      <button data-p="11,3">11 ÷ 3</button><button data-p="7,2">7 ÷ 2</button><button data-p="13,5">13 ÷ 5</button><button data-p="100,7">100 ÷ 7</button><button data-p="6,6">6 ÷ 6</button><button data-p="3,5">3 ÷ 5</button>
+    </div>
+    <div id="err"></div>
+  </section>
+
+  <section class="card wide eqbar" id="eqn"></section>
+
+  <section class="card">
+    <div class="stage">
+      <div id="stamp"></div>
+      <div class="reg"><div class="name">A<small>accumulator</small></div><div class="bits" id="A"></div><div class="val" id="vA"></div></div>
+      <div class="reg"><div class="name">Q<small>quotient / dividend</small></div><div class="bits" id="Q"></div><div class="val" id="vQ"></div></div>
+      <div class="reg"><div class="name">M<small>divisor</small></div><div class="bits" id="M"></div><div class="val" id="vM"></div></div>
+    </div>
+    <div class="explain" id="ex"></div>
+    <div class="prog"><div id="pg"></div></div>
+    <div class="ctrl">
+      <button id="reset">⟲ Reset</button><button id="prev">◀ Back</button>
+      <button class="go" id="next">Next step ▶</button><button id="play">▶ Auto-play</button>
+      <button id="end">Jump to result ⏭</button>
+      <span class="led" id="led"><i></i> sign of A</span>
+    </div>
+  </section>
+
+  <aside class="card"><h2>Click any step</h2><div id="tl"></div></aside>
+
+  <section class="card wide"><h2>Iteration log</h2>
+    <table><thead><tr><th>#</th><th>A after subtract</th><th>Sign</th><th>Q₀</th><th>A at end of step</th><th>What happened</th></tr></thead><tbody id="log"></tbody></table>
+  </section>
+
+  <section id="result" class="wide"></section>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
+let S=[],cur=0,timer=null,n=0,D=0,V=0,wasFin=false;
+const bin=(x,l)=>x.toString(2).padStart(l,'0');
+const sv=a=>(a>>n)&1?a-(1<<(n+1)):a;
+
+function build(dv,ds){
+  n=Math.max(dv.toString(2).length,ds.toString(2).length);
+  D=ds;V=dv;S=[];
+  const mk=(1<<(n+1))-1,mq=(1<<n)-1;
+  let A=0,Q=dv;
+  S.push({k:'init',it:0,A,Q,t:'Initialise',r:'',cls:'',h:'Get ready',p:`A starts at 0. Q holds the dividend ${dv}. M holds the divisor ${ds}. A and M get one extra bit (${n+1} bits) so the sign can be read from the leftmost bit. We will repeat the loop ${n} times, once per bit of Q.`});
+  for(let i=1;i<=n;i++){
+    const A0=A,msb=(Q>>(n-1))&1;
+    A=((A<<1)|msb)&mk;Q=(Q<<1)&mq;
+    S.push({k:'shift',it:i,A,Q,t:'Shift left A,Q',r:'',h:`Iteration ${i}: shift left`,p:`Move A and Q left by one bit together. The top bit of Q (${msb}) slides into the bottom of A. The new bottom bit of Q is empty (0) for now.`,eq:`A = ${A0} → ${A}`,msb});
+    const Ash=A;A=(A-ds)&mk;const neg=(A>>n)&1;
+    S.push({k:'sub',it:i,A,Q,neg,t:'A = A − M',r:sv(A)+'',h:`Iteration ${i}: subtract`,p:neg?`The result is negative: the leftmost bit of A is 1. That is a sign that M did not fit.`:`The result is zero or positive: the leftmost bit of A is 0. M fit.`,eq:`${Ash} − ${ds} = ${sv(A)}   (${bin(A,n+1)})`,cls:neg?'neg':'pos'});
+    if(neg){S.push({k:'chk',it:i,A,Q,neg,t:'Sign = 1, set Q₀ = 0',r:'neg',h:`Iteration ${i}: A is negative`,p:`Q₀ stays 0, because the divisor did not fit this time. Next, A must be restored.`,cls:'neg'});
+      const Ab=A;A=(A+ds)&mk;
+      S.push({k:'res',it:i,A,Q,neg,t:'Restore: A = A + M',r:sv(A)+'',h:`Iteration ${i}: restore!`,p:`Add M back so A returns to its value from before the subtraction. The negative number is gone and is never carried to the next step.`,eq:`${sv(Ab)} + ${ds} = ${sv(A)}   (back to ${Ash})`,cls:'back'});}
+    else{Q|=1;S.push({k:'chk',it:i,A,Q,neg,t:'Sign = 0, set Q₀ = 1',r:'keep',h:`Iteration ${i}: A is not negative`,p:`Set Q₀ = 1, because the divisor fit. A keeps the subtracted value. No restore is needed.`,cls:'pos'});}
+  }
+  S.push({k:'fin',it:n+1,A,Q,t:'Final answer',r:`${Q} R ${A}`,h:'Done',p:`All ${n} iterations are complete. Q is the quotient and A is the remainder.`,cls:'pos',fin:1});
+}
+
+function bits(id,val,len,prev,signbit,slide){
+  const s=bin(val,len),p=prev==null?s:bin(prev,len);
+  $(id).innerHTML=[...s].map((c,i)=>`<div class="bit${c==='0'?' z':''}${signbit&&i===0?' sign':''}${slide?' slide':(c!==p[i]?' flip':'')}">${c}</div>`).join('');
+}
+
+function fly(msb){
+  if(RM)return;
+  const f=$('#Q .bit:first-child').getBoundingClientRect(),dst=$('#A .bit:last-child'),t=dst.getBoundingClientRect();
+  const el=document.createElement('div');el.className='fly';el.textContent=msb;
+  el.style.left=f.left+'px';el.style.top=f.top+'px';document.body.appendChild(el);
+  dst.style.visibility='hidden';
+  el.animate([{transform:'translate(0,0) scale(1.3)'},{transform:`translate(${t.left-f.left}px,${t.top-f.top}px) scale(1)`}],{duration:650,easing:'ease-in-out'}).onfinish=()=>{el.remove();dst.style.visibility=''};
+}
+
+function boom(){
+  if(RM)return;
+  const cols=['#3d7bff','#ffb020','#a05bff','#22e6a0','#ff3b5c'];
+  for(let i=0;i<60;i++){
+    const c=document.createElement('div');c.className='cf';
+    c.style.left='50%';c.style.top='30%';c.style.background=cols[i%5];document.body.appendChild(c);
+    const dx=(Math.random()-.5)*900,dy=Math.random()*500-150;
+    c.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:`translate(${dx}px,${dy+300}px) rotate(${Math.random()*720}deg)`,opacity:0}],{duration:1300+Math.random()*700,easing:'cubic-bezier(.2,.8,.4,1)'}).onfinish=()=>c.remove();
+  }
+}
+
+function render(){
+  const s=S[cur],pv=S[Math.max(cur-1,0)];
+  const sl=s.k==='shift';
+  bits('#A',s.A,n+1,pv.A,true,sl);bits('#Q',s.Q,n,pv.Q,false,sl);bits('#M',D,n+1,D,true);
+  const A=$('#A');A.className='bits'+(s.cls==='neg'&&s.k!=='chk'?' neg':'')+(s.k==='res'?' back':'');
+  if(s.k==='chk'&&s.neg)A.className='bits neg';
+  const st=$('#stamp');
+  if((s.k==='sub'||s.k==='chk')&&s.neg){st.textContent='NEGATIVE!';st.className='show n'}
+  else if(s.k==='res'){st.textContent='RESTORED';st.className='show p'}
+  else st.className='';
+  if(sl&&cur>0&&S[cur-1]!==undefined)fly(s.msb);
+  $('#vA').innerHTML=`<b>${sv(s.A)}</b> signed<br>${bin(s.A,n+1)}`;
+  $('#vQ').innerHTML=`<b>${s.Q}</b> decimal<br>${bin(s.Q,n)}`;
+  $('#vM').innerHTML=`<b>${D}</b> decimal<br>${bin(D,n+1)}`;
+  const e=$('#ex');e.className='explain '+(s.cls==='neg'?'neg':(s.cls==='pos'||s.cls==='back')?'pos':'');
+  e.innerHTML=`<h3>${s.h}</h3><p>${s.p}</p>${s.eq?`<div class="eq">${s.eq}</div>`:''}`;
+  const sign=(s.A>>n)&1,showSign=['sub','chk','res'].includes(s.k);
+  $('#led').innerHTML=`<i class="${showSign?(sign?'on-neg':'on-pos'):''}"></i> sign of A: ${showSign?(sign?'negative':'non-negative'):'—'}`;
+  $('#pg').style.width=(cur/(S.length-1)*100)+'%';
+  $('#prev').disabled=cur===0;$('#next').disabled=cur===S.length-1;$('#reset').disabled=cur===0;
+  // live equation
+  const qb=Array(n).fill(null);
+  S.forEach((x,i)=>{if(x.k==='chk'&&i<=cur)qb[x.it-1]=x.neg?0:1});
+  $('#eqn').innerHTML=`<span>${V} ÷ ${D} =</span><span class="qs">${qb.map((b,i)=>`<b class="qb${b!=null?' on':''}${s.k==='chk'&&s.it===i+1?' new':''}">${b==null?'?':b}</b>`).join('')}</span><span class="e2${s.fin?' pop':''}">${s.fin?`= ${s.Q} R ${s.A}`:''}</span>`;
+  if(s.fin&&!wasFin)boom();
+  wasFin=!!s.fin;
+  // timeline
+  let h='',last=-1;
+  S.forEach((x,i)=>{
+    if(x.it!==last){if(last!==-1)h+='</div>';h+=`<div class="it"><span>${x.it===0?'Setup':x.it>n?'Result':'Iteration '+x.it}</span>`;last=x.it}
+    h+=`<button class="st ${i<cur?'done':''} ${i===cur?'act':''} ${x.k==='res'||(x.k==='sub'&&x.neg)?'rs':''}" data-i="${i}"><span class="t">${x.t}</span><span class="r">${x.r}</span></button>`;
+  });
+  $('#tl').innerHTML=h+'</div>';
+  const a=$('#tl .act');if(a)a.scrollIntoView({block:'nearest'});
+  // log
+  let rows='';
+  S.forEach((x,i)=>{if(x.k==='chk'&&i<=cur){const sub=S[i-1],rs=S[i+1]&&S[i+1].k==='res'&&i+1<=cur;
+    const aEnd=x.neg?(rs?S[i+1].A:null):x.A;
+    rows+=`<tr><td>${x.it}</td><td>${sv(sub.A)}</td><td>${x.neg?'−':'+'}</td><td>${x.neg?0:1}</td><td>${aEnd==null?'…':sv(aEnd)}</td><td><span class="tag ${x.neg?'r':'k'}">${x.neg?'restored':'kept'}</span></td></tr>`}});
+  $('#log').innerHTML=rows||'<tr><td colspan="6" style="color:var(--mute)">Rows appear as you reach each sign check.</td></tr>';
+  // result
+  const R=$('#result');
+  if(s.fin){
+    const q=s.Q,r=s.A,rc=S.filter(x=>x.k==='res').length;
+    R.className='show wide';
+    R.innerHTML=`<h2>${V} ÷ ${D} = ${q} remainder ${r}</h2>
+    <div class="big"><div>Quotient (Q)<b>${q}</b><small>${bin(q,n)}₂</small></div><div>Remainder (A)<b>${r}</b><small>${bin(r,n+1)}₂</small></div><div>Restores<b>${rc}</b><small>of ${n} iterations</small></div></div>
+    <p style="margin-top:16px">Check: ${D} × ${q} + ${r} = <b style="color:#fff">${D*q+r}</b>, which equals the dividend ${V}. Each time A went negative, the divisor was added right back, so A was never negative when the next shift began. Non-restoring division skips that step and corrects the error later.</p>`;
+  }else R.className='wide';
+}
+
+function go(i){cur=Math.max(0,Math.min(S.length-1,i));render()}
+function stop(){clearInterval(timer);timer=null;$('#play').textContent='▶ Auto-play'}
+function start(){
+  stop();
+  const dv=parseInt($('#dv').value),ds=parseInt($('#ds').value),er=$('#err');
+  if(isNaN(dv)||isNaN(ds)||dv<0||dv>255||ds<1||ds>255){er.textContent='Enter a dividend from 0 to 255 and a divisor from 1 to 255. Division by zero is undefined.';return}
+  er.textContent='';wasFin=false;build(dv,ds);cur=0;render();
+}
+$('#start').onclick=start;
+$('#next').onclick=()=>{stop();go(cur+1)};
+$('#prev').onclick=()=>{stop();go(cur-1)};
+$('#reset').onclick=()=>{stop();go(0)};
+$('#end').onclick=()=>{stop();go(S.length-1)};
+$('#play').onclick=()=>{
+  if(timer)return stop();
+  if(cur===S.length-1)cur=0;
+  $('#play').textContent='❚❚ Pause';
+  timer=setInterval(()=>{if(cur>=S.length-1)return stop();go(cur+1)},1600);
+  go(cur+1);
+};
+$('#tl').onclick=e=>{const b=e.target.closest('.st');if(b){stop();go(+b.dataset.i)}};
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{const[a,c]=b.dataset.p.split(',');$('#dv').value=a;$('#ds').value=c;start()});
+document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'){if(e.key==='Enter')start();return}
+  if(e.key==='ArrowRight'){stop();go(cur+1)}if(e.key==='ArrowLeft'){stop();go(cur-1)}});
+start();
+</script>
+</body>
+</html>
